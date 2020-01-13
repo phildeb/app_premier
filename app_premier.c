@@ -125,8 +125,11 @@
 #define MSEC_DELTA_VOL 2000 // millisec between decrease by 1
 #define CONCISE_FORMAT_STRING "%s!%s!%s!%d!%s!%s!%s!%s!%s!%s!%d!%s!%s!%s\n"
 
+#pragma GCC diagnostic ignored "-Wunused-result"
+
 static const char premier_app[] = "PREMIER";
 
+float square_sum(short int *data, int nb_short);
 
 static struct ast_manager_event_blob *premier_foreground_ended_to_ami(struct stasis_message *message)
 {
@@ -194,7 +197,6 @@ static int timed_read(int fd, void *data, int datalen, int timeout /*, int pid *
 	int res;
 	int i;
 	struct pollfd fds[1];
-	//int fd = open(MUSIC_FILE, O_RDONLY | O_NONBLOCK);
 	if (fd == -1)
 	{
 		perror("open");
@@ -211,8 +213,6 @@ static int timed_read(int fd, void *data, int datalen, int timeout /*, int pid *
 		}
 		else if (res == 0)
 		{
-			/* is mpg123 still running? */
-			//kill(pid, 0);
 			if (errno == ESRCH)
 			{
 				return -1;
@@ -248,7 +248,7 @@ float square_sum(short int *data, int nb_short)
 static int premier_exec(struct ast_channel *chan, const char *data)
 {
 	int res = 0;
-	char dir_path[PATH_MAX];
+	//char dir_path[PATH_MAX];
 	char bg_filepath[PATH_MAX];
 	char fg_filepath[PATH_MAX];								
 	char* tmp=NULL;
@@ -300,7 +300,7 @@ static int premier_exec(struct ast_channel *chan, const char *data)
 		return -1;	
 	}
 
-	if (1)//fwav_background > 0)
+	if (fwav_background > 0)
 	{
 		int stop=0;
 		struct timeval now_in;
@@ -308,7 +308,6 @@ static int premier_exec(struct ast_channel *chan, const char *data)
 		int total_ms = 0;
 		int ramped_start_ms = 0;
 		int ramped_end_ms = 0;
-		//int fwav_background = -1;
 		int fwav_foreground = -1;
 		int sampling_rate = 8000;
 		int timeout = 2;
@@ -361,7 +360,7 @@ static int premier_exec(struct ast_channel *chan, const char *data)
 						nb_samples = res / 2;
 					}else{						
 						ast_log(LOG_WARNING, "NOK Premier could not reopen background sound file [%s] \n",bg_filepath);
-						if (fwav_foreground > 0) fclose(fwav_foreground);
+						if (fwav_foreground > 0) close(fwav_foreground);
 						return -1;						
 					}
 				}
@@ -389,7 +388,7 @@ static int premier_exec(struct ast_channel *chan, const char *data)
 					{
 						if (fwav_foreground <= 0)
 						{
-							char *str_var_foreground = pbx_builtin_getvar_helper(chan, "FOREGROUND_MUSIC_FILE");//ast_channel_unlock(chan);
+							const char *str_var_foreground = pbx_builtin_getvar_helper(chan, "FOREGROUND_MUSIC_FILE");//ast_channel_unlock(chan);
 							if (str_var_foreground != NULL && strlen(str_var_foreground))
 							{
 								snprintf(fg_filepath, sizeof(fg_filepath), "%s/sounds/%s", ast_config_AST_DATA_DIR, str_var_foreground);
@@ -443,21 +442,21 @@ static int premier_exec(struct ast_channel *chan, const char *data)
 
 							if (delta_vol == MAX_DELTA_VOL) // decreasing backgrounf volume is done
 							{
-								short frdata[160];
+								short frdata[160]={0};
 								int nb_read_fwav_foreground = read(fwav_foreground, frdata, sizeof(frdata));
 								nb_samples = nb_read_fwav_foreground / 2;
 
 								//ast_verb(3, "%d read bytes in fd %d ( %d samples slin short) \n", nb_read_fwav_foreground, fwav_foreground , nb_samples);
 								if (nb_read_fwav_foreground <= 0)
 								{
-									char *str_var_foreground = pbx_builtin_getvar_helper(chan, "FOREGROUND_MUSIC_FILE");
+									//const char *str_var_foreground = pbx_builtin_getvar_helper(chan, "FOREGROUND_MUSIC_FILE");
 									ramped_end_ms = total_ms;
 									fwav_foreground = -1;
 									pbx_builtin_setvar_helper(chan, "FOREGROUND_MUSIC_FILE", "");																				
-									ast_verb(3, "Foreground played res=%d fwav=%d\n", res, fwav_background);																				
+									ast_verb(3, "Foreground played res=%d fwav_background=%d\n", res, fwav_background);																				
 									manager_event(EVENT_FLAG_CALL, "PremierForegroundEnded","channel: %s\r\nfilename: %s\r\n",ast_channel_name(chan) ,fg_filepath);									
 								}else{// MIXING !!!
-									float pow_background = square_sum(myf.frdata, nb_samples);
+									//float pow_background = square_sum(myf.frdata, nb_samples);
 									float pow_foreground = square_sum(frdata, nb_samples);									
 									if (pow_foreground > 0.000001){ 			
 										for (int k = 0; k < nb_samples; k++){
@@ -547,7 +546,7 @@ static char *complete_premier(const char *line, const char *word, int pos, int s
 
 static char *premier_show(struct ast_cli_entry *e, int cmd, struct ast_cli_args *a)
 {
-	int delta_volume = 0;
+	//int delta_volume = 0;
 	//ast_cli(a->fd, "cmd=%d CLI_INIT=%d CLI_GENERATE=%d\n", cmd, CLI_INIT, CLI_GENERATE);
 	//ast_verb(3, "cmd=%d CLI_INIT=%d CLI_GENERATE=%d\n", cmd, CLI_INIT, CLI_GENERATE);
 	switch (cmd)
@@ -564,92 +563,94 @@ static char *premier_show(struct ast_cli_entry *e, int cmd, struct ast_cli_args 
 	}
 
 	if (1)
-	{
-		if (NULL != a)
-		{
-			char *mymodule = NULL;
-			char *mycmd = NULL;
-			char *mychan = NULL;
-			char *mywav = NULL;
-			ast_cli(a->fd, "a->argc is [%d]\n", a->argc);
-			if (a->argc >= 1)
-			{
-				mymodule = a->argv[0];
-				ast_cli(a->fd, "module is [%s]\n", a->argv[0]); // premier
-			}
-			if (a->argc >= 2)
-			{
-				mycmd = a->argv[1];
-				ast_cli(a->fd, "command is [%s]\n", a->argv[1]); /// play
-			}
-			if (a->argc >= 4)
-			{
-				mywav = a->argv[3];
-				ast_cli(a->fd, "sound file is [%s]\n", a->argv[3]); // fichier wav
-			}
-			if (a->argc >= 3)
-			{
-				mychan = a->argv[2];
-				ast_cli(a->fd, "channel is [%s]\n", a->argv[2]);
-				/*if (sscanf(a->argv[2], "%d", &delta_volume) == 1){
-					ast_cli(a->fd, "delta_volume is [%d]\n", delta_volume);
-				}*/
-				struct ast_channel *chan2 = NULL;
-				if (!(chan2 = ast_channel_get_by_name(mychan)))
-				{
-					ast_log(LOG_WARNING, "No such channel: %s\n", mychan);
-				}
-				else
-				{
-					ast_verb(3, "OK found channel [%s]\n", mychan);
-					//pbx_builtin_setvar_helper(chan2, "BACKGROUND", PROMPT_FILE);
-					pbx_builtin_setvar_helper(chan2, "FOREGROUND_MUSIC_FILE", mywav); //FOREGROUND_MUSIC_FILE);
-				}
-			}
-			if(0){
-				struct ao2_container *channels;
-				struct ao2_iterator it_chans;
-				struct stasis_message *msg;
-				int numchans = 0, concise = 0, verbose = 0, count = 0;
+  {
+      if (NULL != a)
+      {
+          //char *mymodule = NULL;
+          //char *mycmd = NULL;
+          const char *mywav;
+          ast_cli(a->fd, "a->argc is [%d]\n", a->argc);
+          if (a->argc >= 1)
+          {
+              //mymodule = a->argv[0];
+              ast_cli(a->fd, "module is [%s]\n", a->argv[0]); // premier
+          }
+          if (a->argc >= 2)
+          {
+              //mycmd = a->argv[1];
+              ast_cli(a->fd, "command is [%s]\n", a->argv[1]); /// play
+          }
+          if (a->argc >= 4)
+          {
+              mywav = a->argv[3];
+              ast_cli(a->fd, "sound file is [%s]\n", a->argv[3]); // fichier wav
+              /*}
+                if (a->argc >= 3)
+                {*/
+              const char *mychan;
+              mychan = a->argv[2];
+              ast_cli(a->fd, "channel is [%s]\n", a->argv[2]);
+              /*if (sscanf(a->argv[2], "%d", &delta_volume) == 1){
+                ast_cli(a->fd, "delta_volume is [%d]\n", delta_volume);
+                }*/
+              struct ast_channel *chan2 = NULL;
+              if (!(chan2 = ast_channel_get_by_name(mychan)))
+              {
+                  ast_log(LOG_WARNING, "No such channel: %s\n", mychan);
+              }
+              else
+              {
+                  ast_verb(3, "OK found channel [%s]\n", mychan);
+                  //pbx_builtin_setvar_helper(chan2, "BACKGROUND", PROMPT_FILE);
+                  pbx_builtin_setvar_helper(chan2, "FOREGROUND_MUSIC_FILE", mywav); //FOREGROUND_MUSIC_FILE);
+              }
+          }
+#if 0
+          if(0){
+              struct ao2_container *channels;
+              struct ao2_iterator it_chans;
+              struct stasis_message *msg;
+              int concise = 0, verbose = 0, count = 0;
 
-				if (!(channels = stasis_cache_dump(ast_channel_cache_by_name(), ast_channel_snapshot_type())))
-				{
-					ast_cli(a->fd, "Failed to retrieve cached channels\n");
-					return CLI_SUCCESS;
-				}
-				it_chans = ao2_iterator_init(channels, 0);
-				for (; (msg = ao2_iterator_next(&it_chans)); ao2_ref(msg, -1))
-				{
-					struct ast_channel_snapshot *cs = stasis_message_data(msg);
-					char durbuf[16] = "-";
-					if (!ast_tvzero(cs->creationtime))
-					{
-						int duration = (int)(ast_tvdiff_ms(ast_tvnow(), cs->creationtime) / 1000);
-						int durh = duration / 3600;
-						int durm = (duration % 3600) / 60;
-						int durs = duration % 60;
-						snprintf(durbuf, sizeof(durbuf), "%02d:%02d:%02d", durh, durm, durs);
-						ast_cli(a->fd, CONCISE_FORMAT_STRING, cs->name, cs->context, cs->exten, cs->priority, ast_state2str(cs->state),
-								S_OR(cs->appl, "(None)"),
-								cs->data,
-								cs->caller_number,
-								cs->accountcode,
-								cs->peeraccount,
-								cs->amaflags,
-								durbuf,
-								cs->bridgeid,
-								cs->uniqueid);
-					}
-				}
-				ao2_iterator_destroy(&it_chans);
-			}
-			return CLI_SUCCESS;
-		}
-	}
-	else
-	{
-		return CLI_SHOWUSAGE;
-	}
+              if (!(channels = stasis_cache_dump(ast_channel_cache_by_name(), ast_channel_snapshot_type())))
+              {
+                  ast_cli(a->fd, "Failed to retrieve cached channels\n");
+                  return CLI_SUCCESS;
+              }
+              it_chans = ao2_iterator_init(channels, 0);
+              for (; (msg = ao2_iterator_next(&it_chans)); ao2_ref(msg, -1))
+              {
+                  struct ast_channel_snapshot *cs = stasis_message_data(msg);
+                  char durbuf[16] = "-";
+                  if (!ast_tvzero(cs->creationtime))
+                  {
+                      int duration = (int)(ast_tvdiff_ms(ast_tvnow(), cs->creationtime) / 1000);
+                      int durh = duration / 3600;
+                      int durm = (duration % 3600) / 60;
+                      int durs = duration % 60;
+                      snprintf(durbuf, sizeof(durbuf), "%02d:%02d:%02d", durh, durm, durs);
+                      ast_cli(a->fd, CONCISE_FORMAT_STRING, cs->name, cs->context, cs->exten, cs->priority, ast_state2str(cs->state),
+                              S_OR(cs->appl, "(None)"),
+                              cs->data,
+                              cs->caller_number,
+                              cs->accountcode,
+                              cs->peeraccount,
+                              cs->amaflags,
+                              durbuf,
+                              cs->bridgeid,
+                              cs->uniqueid);
+                  }
+              }
+              ao2_iterator_destroy(&it_chans);
+          }
+#endif
+          return CLI_SUCCESS;
+      }
+      else
+      {
+          return CLI_SHOWUSAGE;
+      }
+  }
 	return CLI_FAILURE;
 }
 
@@ -672,7 +673,7 @@ static int unload_module(void)
 static int premier_play_foreground(struct mansession *s, const struct message *m)
 {
 	const char *filename, *channel_name;
-	int paused, penalty = 0;
+	//int paused, penalty = 0;
 
 	filename = astman_get_header(m, "filename");
 	channel_name = astman_get_header(m, "channel");
